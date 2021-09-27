@@ -11,6 +11,7 @@ python = "^3.9"
 yade = {git = "https://github.com/dzshn/yade", rev = "main"}
 markovify = "^0.9.3"
 tinydb = "^4.5.2"
+transformers = {version = "^4.11.0", extras = ["tf-cpu"]}
 
 [tool.poetry.dev-dependencies]
 yapf = "^0.31.0"

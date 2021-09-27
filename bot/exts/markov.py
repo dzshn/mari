@@ -1,15 +1,9 @@
-import collections
 from typing import Optional
 
 import discord
 import markovify
 from tinydb import TinyDB, where
-from discord.ext import commands, tasks
-
-Task = collections.namedtuple('Task', 'channel message users')
-Task.channel: discord.TextChannel
-Task.message: discord.Message
-Task.users: list[discord.User]
+from discord.ext import commands
 
 
 class InformalText(markovify.Text):
@@ -32,54 +26,6 @@ class Markov(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.db: TinyDB = bot.db
-        self.tasks: collections.deque[Task] = collections.deque()
-
-    @tasks.loop()
-    async def collect_chains(self):
-        channel, message, users = self.tasks.popleft()
-
-        corpuses: dict[discord.User, list[str]] = collections.defaultdict(list)
-        async for msg in channel.history(limit=None):
-            if msg.author.bot:
-                continue
-
-            if users is not None and msg.author not in users:
-                continue
-
-            if msg.content:
-                corpuses[msg.author].append(msg.content)
-
-        for user, corpus in corpuses.items():
-            self.db.table('chains').upsert({
-                'channel': channel.id,
-                'user': user.id,
-                'model': InformalText('\n'.join(corpus), state_size=3).to_dict()
-            }, (where('channel') == channel.id) & (where('user') == user.id))
-
-        await message.reply(
-            f'Finished collecting {sum(map(len, corpuses.values()))} '
-            f'messages from {len(corpuses.keys())} users!'
-        )
-
-        if not self.tasks:
-            self.collect_chains.stop()
-
-    @commands.command()
-    async def collect(
-        self,
-        ctx: commands.Context,
-        users: commands.Greedy[discord.Member],
-        channel: Optional[discord.TextChannel] = None
-    ):
-        """Collect messages for later impersonation"""
-        if channel is None:
-            channel = ctx.channel
-
-        self.tasks.append(Task(channel=channel, message=ctx.message, users=users or None))
-        if not self.collect_chains.is_running():
-            self.collect_chains.start()
-
-        await ctx.send('Queued!')
 
     @commands.command()
     async def impersonate(
@@ -103,10 +49,9 @@ class Markov(commands.Cog):
             channels = [ctx.channel]
 
         for channel in channels:
-            for user in users:
-                query = (where('user') == user.id) & (where('channel') == channel.id)
-                if self.db.table('chains').contains(query):
-                    models.append(InformalText.from_dict(self.db.table('chains').get(query)['model']))
+            for user, corpus in self.db.table('collects').get(where('channel') == channel.id):
+                if user in users:
+                    models.append(InformalText('\n'.join(corpus)))
 
         if not models:
             await ctx.send('No data!')

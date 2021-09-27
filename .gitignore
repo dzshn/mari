@@ -1,4 +1,5 @@
 .vscode/
+.ropeproject/
 __pycache__/
 TOKEN
 db.json
