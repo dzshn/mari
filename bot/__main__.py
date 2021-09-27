@@ -26,7 +26,8 @@ class MariBot(commands.Bot):
                 everyone=False, users=False, roles=False, replied_user=True
             ),
             command_prefix=commands.when_mentioned_or('m+'),
-            case_insensitive=True
+            case_insensitive=True,
+            activity=discord.Game('with Markov chains')
         )
 
         self.load_extension('yade')
